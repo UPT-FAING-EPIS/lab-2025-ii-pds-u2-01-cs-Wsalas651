@@ -47,7 +47,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet sonarscanner begin /k:"72943816s_si889-u2lab01" /o:"72943816" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          dotnet sonarscanner begin /k:"72943816s_si889-u2lab01" /o:"si889" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
           dotnet build ${{ env.PROJECT_PATH }}
           dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
