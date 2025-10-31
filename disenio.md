@@ -1,4 +1,3 @@
-```mermaid
 classDiagram
 
 class CreditCardFactoryMethod
@@ -43,5 +42,3 @@ ICreditCard <|.. Platinum
 CreditCardFactoryMethod <|-- PlatinumFactoryMethod
 ICreditCard <|.. Titanium
 CreditCardFactoryMethod <|-- TitaniumFactoryMethod
-
-```
