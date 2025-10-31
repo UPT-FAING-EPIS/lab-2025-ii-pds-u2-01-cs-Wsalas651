@@ -76,3 +76,4 @@ jobs:
             NUGET_PAT: ${{ secrets.NUGET_PAT }}
       - name: Publish NuGet package 
         run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg --source github-packages --skip-duplicate
+
