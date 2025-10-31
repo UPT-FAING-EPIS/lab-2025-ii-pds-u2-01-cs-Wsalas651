@@ -70,14 +70,8 @@ jobs:
       - name: Pack NuGet package
         run: dotnet pack ${{ env.PROJECT_PATH }} --configuration Release --output ${{ env.OUTPUT_PATH }}
       
-      - name: Configure GitHub Packages Source
-        run: dotnet nuget add source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --name github-packages --username ${{ github.actor }} --password ${{ secrets.NUGET_PAT }} --store-password-in-clear-text
+      - name: Publish NuGet package
+        run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --api-key "${{ secrets.NUGET_PAT }}" --skip-duplicate
         env:
             NUGET_PAT: ${{ secrets.NUGET_PAT }}
-      - name: Set API Key for GitHub Packages
-        run: dotnet nuget setapikey ${{ secrets.NUGET_PAT }} --source github-packages
-        env:
-            NUGET_PAT: ${{ secrets.NUGET_PAT }}
-      - name: Publish NuGet package 
-        run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg --source github-packages --skip-duplicate
 
