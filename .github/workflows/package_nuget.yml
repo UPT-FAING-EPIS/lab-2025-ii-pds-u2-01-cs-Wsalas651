@@ -74,6 +74,10 @@ jobs:
         run: dotnet nuget add source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --name github-packages --username ${{ github.actor }} --password ${{ secrets.NUGET_PAT }} --store-password-in-clear-text
         env:
             NUGET_PAT: ${{ secrets.NUGET_PAT }}
+      - name: Set API Key for GitHub Packages
+        run: dotnet nuget setapikey ${{ secrets.NUGET_PAT }} --source github-packages
+        env:
+            NUGET_PAT: ${{ secrets.NUGET_PAT }}
       - name: Publish NuGet package 
         run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg --source github-packages --skip-duplicate
 
