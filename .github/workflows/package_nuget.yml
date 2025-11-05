@@ -83,7 +83,6 @@ jobs:
   package-and-publish:
     needs: test-and-analyze
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -93,6 +92,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # 👇 Paso necesario para evitar el error NETSDK1004
       - name: Restore dependencies
         run: dotnet restore ${{ env.MAIN_PROJECT_PATH }}
 
@@ -100,16 +100,11 @@ jobs:
         run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
 
       - name: Pack NuGet package
-        run: dotnet pack ${{ env.MAIN_PROJECT_PATH }} --configuration Release --output ${{ env.OUTPUT_PATH }}
+        run: dotnet pack ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-build --output ${{ env.OUTPUT_PATH }}
 
       - name: Publish NuGet package to GitHub Packages
-        run: |
-          for file in $(find ${{ env.OUTPUT_PATH }} -name "*.nupkg"); do
-            echo "📦 Publicando paquete: $file"
-            dotnet nuget push "$file" \
-              --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
-              --api-key "${{ secrets.GITHUB_TOKEN }}" \
-              --skip-duplicate
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg \
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+          --api-key "${{ secrets.GITHUB_TOKEN }}" \
+          --skip-duplicate
+
