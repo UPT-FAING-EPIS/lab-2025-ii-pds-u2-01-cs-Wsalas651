@@ -92,10 +92,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      # 👇 Paso necesario para evitar el error NETSDK1004
+      # ✅ Restaurar toda la solución, no solo el proyecto
       - name: Restore dependencies
-        run: dotnet restore ${{ env.MAIN_PROJECT_PATH }}
+        run: dotnet restore
 
+      # ✅ Compilar el proyecto principal
       - name: Build project
         run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
 
@@ -107,4 +108,5 @@ jobs:
           --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
           --api-key "${{ secrets.GITHUB_TOKEN }}" \
           --skip-duplicate
+
 
