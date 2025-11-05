@@ -10,35 +10,30 @@ permissions:
   contents: write
   packages: write
 
-# 💡 Información proporcionada por el usuario para SonarCloud:
-# Project Key: 72943816s_si889-u2lab01
-# Organization: 72943816s
-
 env:
-  # Ruta al proyecto principal que contiene el código a analizar, probar y empaquetar
+  # Rutas del proyecto principal y de pruebas
   MAIN_PROJECT_PATH: ./Bank/Bank.Domain/Bank.Domain.csproj
-  # Ruta donde se almacenarán los paquetes NuGet
-  OUTPUT_PATH: ./packages
-  # Ruta al proyecto de pruebas (Asegúrate de que este es el nombre correcto de tu proyecto de pruebas)
   TEST_PROJECT_PATH: ./Bank/Bank.Domain.Tests/Bank.Domain.Tests.csproj
-  # Clave de tu proyecto SonarCloud
+
+  # Carpeta donde se generarán los paquetes NuGet
+  OUTPUT_PATH: ./packages
+
+  # Configuración de SonarCloud
   SONAR_PROJECT_KEY: 72943816s_si889-u2lab01
-  # Organización de SonarCloud
   SONAR_ORGANIZATION: 72943816s
 
 jobs:
   # -----------------------------------------------------------
-  # JOB 1: test-and-analyze
-  # Este trabajo ejecuta el análisis de SonarCloud, incluyendo pruebas y cobertura.
+  # JOB 1: test-and-analyze (SonarCloud + Tests)
   # -----------------------------------------------------------
   test-and-analyze:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository (Fetch Depth 0 for Sonar)
         uses: actions/checkout@v4
         with:
-          # Es crucial para que SonarCloud pueda analizar el historial de commits
-          fetch-depth: 0 
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
@@ -52,35 +47,30 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          # Asegura que la ruta del escáner esté disponible
           export PATH="$PATH:$HOME/.dotnet/tools"
-
-          # 1. BEGIN: Inicializa el análisis
           dotnet sonarscanner begin \
             /k:"${{ env.SONAR_PROJECT_KEY }}" \
             /o:"${{ env.SONAR_ORGANIZATION }}" \
             /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.cs.opencover.reportsPaths="**/${{ env.TEST_PROJECT_PATH }}/**/*.xml" \
+            /d:sonar.cs.opencover.reportsPaths="**/coverage.xml" \
             /d:sonar.coverage.exclusions="**/*Tests.cs,**/*.Tests.csproj"
 
-      # 2. RUN TESTS and BUILD: Ejecuta las pruebas y genera el reporte de cobertura en formato compatible con Sonar.
-      # La compilación se realiza automáticamente como parte de la prueba.
+      - name: Restore and Build Project
+        run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
+
       - name: Run Tests and Generate Coverage Report
         run: |
-          # Ejecuta los tests del proyecto de pruebas y genera la cobertura en formato OpenCover/XML
-          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-restore --no-build \
+          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-build \
             /p:CollectCoverage=true \
             /p:CoverletOutputFormat=opencover \
-            /p:CoverletOutput="./TestResults/coverage/"
-            
-      # 3. END: Finaliza el análisis y envía los resultados a SonarCloud
+            /p:CoverletOutput=./TestResults/coverage/
+
       - name: End SonarCloud Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-      # Subir resultados de cobertura (opcional, pero útil para revisión)
       - name: Upload Coverage Results
         uses: actions/upload-artifact@v4
         with:
@@ -88,12 +78,12 @@ jobs:
           path: '**/TestResults/coverage/coverage.xml'
 
   # -----------------------------------------------------------
-  # JOB 2: package-and-publish
-  # Este trabajo solo se ejecuta si el análisis es exitoso.
+  # JOB 2: package-and-publish (Empaquetado y publicación NuGet)
   # -----------------------------------------------------------
   package-and-publish:
     needs: test-and-analyze
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -102,17 +92,24 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
-          
+
       - name: Restore dependencies
-        # Restaurar sólo las dependencias del proyecto principal
         run: dotnet restore ${{ env.MAIN_PROJECT_PATH }}
+
+      - name: Build project
+        run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
 
       - name: Pack NuGet package
         run: dotnet pack ${{ env.MAIN_PROJECT_PATH }} --configuration Release --output ${{ env.OUTPUT_PATH }}
-        
+
       - name: Publish NuGet package to GitHub Packages
-        # Usamos GITHUB_TOKEN estándar, ya que GitHub Packages lo admite.
-        uses: nuget/setup-nuget@v1 # Necesario si usas comandos dotnet nuget, aunque actions/setup-dotnet suele ser suficiente
-      - run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
+        run: |
+          for file in $(find ${{ env.OUTPUT_PATH }} -name "*.nupkg"); do
+            echo "📦 Publicando paquete: $file"
+            dotnet nuget push "$file" \
+              --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+              --api-key "${{ secrets.GITHUB_TOKEN }}" \
+              --skip-duplicate
+          done
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Usamos el token generado automáticamente por GitHub Actions.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
