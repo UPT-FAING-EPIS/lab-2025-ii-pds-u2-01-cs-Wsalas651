@@ -70,7 +70,8 @@ jobs:
 
       - name: Run Tests and Generate Coverage Report
         run: |
-          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-restore --no-build \
+          dotnet build ${{ env.TEST_PROJECT_PATH }} --configuration Release --no-restore
+          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-restore \
             /p:CollectCoverage=true \
             /p:CoverletOutputFormat=opencover \
             /p:CoverletOutput="./TestResults/coverage/"
