@@ -11,26 +11,20 @@ permissions:
   packages: write
 
 env:
-  # Rutas del proyecto principal y de pruebas
   MAIN_PROJECT_PATH: ./Bank/Bank.Domain/Bank.Domain.csproj
   TEST_PROJECT_PATH: ./Bank/Bank.Domain.Tests/Bank.Domain.Tests.csproj
-
-  # Carpeta donde se generarán los paquetes NuGet
   OUTPUT_PATH: ./packages
-
-  # Configuración de SonarCloud
   SONAR_PROJECT_KEY: 72943816s_si889-u2lab01
   SONAR_ORGANIZATION: 72943816s
 
 jobs:
   # -----------------------------------------------------------
-  # JOB 1: test-and-analyze (SonarCloud + Tests)
+  # JOB 1: test-and-analyze (Sonar + pruebas + cobertura)
   # -----------------------------------------------------------
   test-and-analyze:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository (Fetch Depth 0 for Sonar)
+      - name: Checkout repository (fetch depth 0 for Sonar)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -56,15 +50,30 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="**/coverage.xml" \
             /d:sonar.coverage.exclusions="**/*Tests.cs,**/*.Tests.csproj"
 
-      - name: Restore and Build Project
-        run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
+      - name: Restore dependencies
+        run: |
+          if [ -f "./Bank/Bank.sln" ]; then
+            echo "🔹 Restaurando solución ./Bank/Bank.sln"
+            dotnet restore ./Bank/Bank.sln
+          else
+            echo "🔹 Restaurando proyecto principal"
+            dotnet restore ${{ env.MAIN_PROJECT_PATH }}
+          fi
+
+      - name: Build solution
+        run: |
+          if [ -f "./Bank/Bank.sln" ]; then
+            dotnet build ./Bank/Bank.sln --configuration Release --no-restore
+          else
+            dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
+          fi
 
       - name: Run Tests and Generate Coverage Report
         run: |
-          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-build \
+          dotnet test ${{ env.TEST_PROJECT_PATH }} --no-restore --no-build \
             /p:CollectCoverage=true \
             /p:CoverletOutputFormat=opencover \
-            /p:CoverletOutput=./TestResults/coverage/
+            /p:CoverletOutput="./TestResults/coverage/"
 
       - name: End SonarCloud Analysis
         env:
@@ -78,7 +87,7 @@ jobs:
           path: '**/TestResults/coverage/coverage.xml'
 
   # -----------------------------------------------------------
-  # JOB 2: package-and-publish (Empaquetado y publicación NuGet)
+  # JOB 2: package-and-publish (NuGet)
   # -----------------------------------------------------------
   package-and-publish:
     needs: test-and-analyze
@@ -92,30 +101,25 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      # ✅ Restaurar toda la solución o el proyecto
+      # 🔧 Restaurar dependencias correctamente antes de compilar
       - name: Restore dependencies
         run: |
           if [ -f "./Bank/Bank.sln" ]; then
-            echo "🔹 Restaurando solución completa..."
+            echo "🔹 Restaurando solución ./Bank/Bank.sln"
             dotnet restore ./Bank/Bank.sln
           else
-            echo "🔹 Restaurando proyecto principal..."
+            echo "🔹 Restaurando proyecto principal"
             dotnet restore ${{ env.MAIN_PROJECT_PATH }}
           fi
 
-      # ✅ Compilar (ya sin restaurar de nuevo)
       - name: Build project
         run: dotnet build ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-restore
 
-      # ✅ Empaquetar NuGet
       - name: Pack NuGet package
         run: dotnet pack ${{ env.MAIN_PROJECT_PATH }} --configuration Release --no-build --output ${{ env.OUTPUT_PATH }}
 
-      # ✅ Publicar a GitHub Packages
       - name: Publish NuGet package to GitHub Packages
         run: dotnet nuget push ${{ env.OUTPUT_PATH }}/*.nupkg \
           --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
           --api-key "${{ secrets.GITHUB_TOKEN }}" \
           --skip-duplicate
-
-
